@@ -24,7 +24,7 @@ sandbox
 run init
 printf 'A\n' >.bashrc
 run link .bashrc
-printf 'junk\n' >"$HOME/.dotsx/store/orphan"
+printf 'junk\n' >"$ST/orphan"
 run ghost
 assert_rc 0 "ghost still exits 0 when orphans exist"
 assert_match "$OUT" "orphan" "lists the unreferenced store file"
@@ -40,7 +40,7 @@ run init
 mkdir d
 printf 'x\n' >d/f
 run link d
-printf 'stray\n' >"$HOME/.dotsx/store/loose"
+printf 'stray\n' >"$ST/loose"
 run ghost
 assert_match "$OUT" "loose" "flags the loose store file"
 case "$OUT" in

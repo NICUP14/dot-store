@@ -8,7 +8,7 @@ run init
 printf 'data\n' >cfg
 run copy cfg cfg
 assert_rc 0 "copy returns 0"
-assert_exists "$HOME/.dotsx/store/cfg" "store has the copy"
+assert_exists "$ST/cfg" "store has the copy"
 assert_file_is "$HOME/cfg" "data" "home has a real copy"
 assert_eq "" "$(readlink "$HOME/cfg" 2>/dev/null)" "home copy is not a symlink"
 assert_match "$(cat "$HOME/.dotsx/index.db")" "f:c:" "recorded as a file copy"
@@ -46,7 +46,7 @@ run copy config/nvim/ -r
 assert_rc 0 "trailing slash source returns 0"
 assert_file_is "$HOME/config/nvim/init.vim" "set nu" "deployed in place under ~/"
 assert_missing "$HOME/nvim" "not flattened to the basename"
-assert_match "$(cat "$HOME/.dotsx/index.db")" ":config/nvim" "db records the home-relative path"
+assert_match "$(cat "$HOME/.dotsx/index.db")" ":$R/config/nvim" "db records the root-relative path"
 
 # A path containing a colon survives the field parsing.
 sandbox
@@ -54,7 +54,7 @@ run init
 printf 'Z\n' >'wei:rd'
 run copy 'wei:rd' 'a:b'
 assert_rc 0 "colon path returns 0"
-assert_match "$(tail -1 "$HOME/.dotsx/index.db")" ":a:b" "colon path stored intact"
+assert_match "$(tail -1 "$HOME/.dotsx/index.db")" ":$R/a:b" "colon path stored intact"
 run sync
 assert_file_is "$HOME/a:b" "Z" "colon path deploys correctly"
 

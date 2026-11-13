@@ -94,9 +94,9 @@ printf 'A\n' >f
 run link f keep                     # a normal entry so the store exists
 EXT=$(mktemp -d)
 ln -s "$EXT" "$HOME/sub"            # ~/sub redirects to an external dir
-mkdir -p "$HOME/.dotsx/store/sub"
-printf 'x\n' >"$HOME/.dotsx/store/sub/x"
-printf 'f:l:644:sub/x\n' >>"$HOME/.dotsx/index.db"
+mkdir -p "$ST/sub"
+printf 'x\n' >"$ST/sub/x"
+printf '%s\n' "f:l:644:$R/sub/x" >>"$HOME/.dotsx/index.db"
 run sync
 assert_rc 1 "sync refuses an entry with a symlinked home parent"
 assert_missing "$EXT/x" "sync did not deploy through the symlinked parent"

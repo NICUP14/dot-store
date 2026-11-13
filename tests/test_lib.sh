@@ -17,8 +17,11 @@ SBX=""
 sandbox() {
 	[ -n "$SBX" ] && rm -rf "$SBX" >/dev/null 2>&1
 	SBX=$(mktemp -d)
+	SBX=$(cd -P -- "$SBX" && pwd -P) # physical, as dotsx records it
 	HOME=$SBX
 	export HOME
+	R=${SBX#/}                # $HOME in db form (paths are relative to /)
+	ST="$SBX/.dotsx/store$SBX" # $HOME's mirror inside the store
 	cd "$SBX" || exit 1
 }
 

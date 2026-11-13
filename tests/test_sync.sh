@@ -48,7 +48,7 @@ sandbox
 run init
 printf 'A\n' >.bashrc
 run link .bashrc bashrc
-printf 'f:l:644:ghost\n' >>"$HOME/.dotsx/index.db"
+printf '%s\n' "f:l:644:$R/ghost" >>"$HOME/.dotsx/index.db"
 run sync
 assert_rc 1 "missing source is a non-fatal error"
 assert_match "$OUT" "source missing" "reports the corruption"
@@ -59,16 +59,16 @@ assert_match "$OUT" "source missing" "reports the corruption"
 # while `c` entries succeeded (deploy_copy makes its own parents).
 sandbox
 run init
-mkdir -p "$HOME/.dotsx/store/.config/nvim" "$HOME/.dotsx/store/.config/fish"
-printf 'set nu\n' >"$HOME/.dotsx/store/.config/nvim/init.vim"
-printf 'x\n' >"$HOME/.dotsx/store/.config/fish/config.fish"
-printf 'f:l:644:.config/nvim/init.vim\n' >>"$HOME/.dotsx/index.db"
-printf 'f:c:644:.config/fish/config.fish\n' >>"$HOME/.dotsx/index.db"
+mkdir -p "$ST/.config/nvim" "$ST/.config/fish"
+printf 'set nu\n' >"$ST/.config/nvim/init.vim"
+printf 'x\n' >"$ST/.config/fish/config.fish"
+printf '%s\n' "f:l:644:$R/.config/nvim/init.vim" >>"$HOME/.dotsx/index.db"
+printf '%s\n' "f:c:644:$R/.config/fish/config.fish" >>"$HOME/.dotsx/index.db"
 assert_missing "$HOME/.config" "home parent does not exist before sync"
 run sync
 assert_rc 0 "sync restores a clone with no pre-existing home tree"
 assert_symlink "$HOME/.config/nvim/init.vim" "link entry deployed under a created parent"
-assert_link_to "$HOME/.config/nvim/init.vim" "$HOME/.dotsx/store/.config/nvim/init.vim" \
+assert_link_to "$HOME/.config/nvim/init.vim" "$ST/.config/nvim/init.vim" \
 	"restored link points into the store"
 assert_file_is "$HOME/.config/fish/config.fish" "x" "copy entry deployed too"
 assert_match "$OUT" "2 files updated" "both entries counted"
@@ -76,9 +76,9 @@ assert_match "$OUT" "2 files updated" "both entries counted"
 # repair restores the same missing-parent case (it shares relink with sync).
 sandbox
 run init
-mkdir -p "$HOME/.dotsx/store/.config/nvim"
-printf 'set nu\n' >"$HOME/.dotsx/store/.config/nvim/init.vim"
-printf 'f:l:644:.config/nvim/init.vim\n' >>"$HOME/.dotsx/index.db"
+mkdir -p "$ST/.config/nvim"
+printf 'set nu\n' >"$ST/.config/nvim/init.vim"
+printf '%s\n' "f:l:644:$R/.config/nvim/init.vim" >>"$HOME/.dotsx/index.db"
 run repair
 assert_rc 0 "repair restores a link under a missing parent"
 assert_symlink "$HOME/.config/nvim/init.vim" "repair created the parent directory"
@@ -90,12 +90,12 @@ run init
 printf 'data\n' >cfg
 chmod 644 cfg
 run copy cfg cfg
-chmod 600 "$HOME/.dotsx/store/cfg"   # store mode drift (recorded 644)
+chmod 600 "$ST/cfg"   # store mode drift (recorded 644)
 printf 'edited\n' >"$HOME/cfg"       # home content drift
 run sync
 assert_rc 0 "sync returns 0"
 assert_match "$OUT" "1 files updated" "an entry needing several fixes counts once"
 assert_file_is "$HOME/cfg" "data" "home content restored from store"
-assert_mode "$HOME/.dotsx/store/cfg" 644 "store mode restored"
+assert_mode "$ST/cfg" 644 "store mode restored"
 
 report

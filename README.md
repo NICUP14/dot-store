@@ -1,8 +1,9 @@
 # dotsx
 
-A dotfile manager in one POSIX shell script. It keeps your configuration files in
-a single directory and puts them where they belong in `$HOME` — as symlinks, or
-as plain copies when a symlink won't do.
+A file manager for configuration in one POSIX shell script. It keeps the files
+you care about — dotfiles in `$HOME`, service units in `/etc`, anything else on
+the machine — in a single directory and puts them where they belong, as
+symlinks, or as plain copies when a symlink won't do.
 
 There is no daemon, no config file, no lockfile, and no runtime to install. The
 whole program is `dotsx.sh`, and the whole state is a directory of your files
@@ -40,7 +41,8 @@ line. The store is an ordinary directory tree. Both are meant to be read, edited
 diffed, and repaired by hand. If `dotsx` vanished tomorrow, everything it manages
 would still be sitting there in a form you can use.
 
-**One job.** It does not wrap `git`, template your configs, or manage packages.
+**One job.** It does not wrap `git`, template your configs, manage packages, or
+escalate privileges for you.
 The store is a normal directory; put it under version control or don't.
 
 ## Install
@@ -64,13 +66,16 @@ dotsx init                          # create ~/.dotsx and its index
 dotsx link ~/.bashrc                # store it, leave a symlink in its place
 dotsx copy ~/.ssh/config            # store it, leave a real copy in its place
 dotsx copy ~/.config/nvim -r        # directories need -r for copy
+sudo HOME="$HOME" "$(command -v dotsx)" copy /etc/systemd/system/foo.service
 dotsx list                          # everything tracked, as a table
-dotsx sync                          # make $HOME match the index
+dotsx sync                          # make the filesystem match the index
 ```
 
 On a new machine, clone your store into `~/.dotsx/store`, restore `index.db`
 alongside it, and run `dotsx sync`. Missing parent directories are created for
-you, so a bare `$HOME` is a fine starting point.
+you, so a bare system is a fine starting point. Paths are recorded absolutely,
+so a store restored under a different username needs its `home/<name>` entries
+renamed to match.
 
 ## Commands
 
@@ -81,7 +86,7 @@ you, so a bare `$HOME` is a fine starting point.
 | `copy`   | `cp`  | Copy into the store, leave an independent copy behind      |
 | `list`   | `ls`  | Print the index as a table                                 |
 | `remove` | `rm`  | Stop tracking; leave an ordinary file behind               |
-| `sync`   |       | Make `$HOME` match the index, non-interactively            |
+| `sync`   |       | Make the filesystem match the index, non-interactively     |
 | `repair` |       | Same walk, but prompt before overwriting unmanaged files   |
 | `ghost`  |       | List store files the index doesn't reference               |
 | `help`   |       | Print usage                                                |
@@ -89,11 +94,11 @@ you, so a bare `$HOME` is a fine starting point.
 ### link and copy
 
 `link` replaces the original with a symlink into the store, so edits at either
-end are the same file. `copy` leaves an independent copy in `$HOME`, for the
+end are the same file. `copy` leaves an independent copy in place, for the
 files that refuse to be symlinks — some daemons and SSH configurations reject
 them, and a few tools rewrite them in place.
 
-Copies flow one way, store to home. After editing a copied file in `$HOME`, run
+Copies flow one way, store to live location. After editing a copied file in place, run
 `copy` again to push it back; a `sync` would instead restore the stored version
 over your edit. Either way the overwritten content is backed up first, so the
 edit is recoverable.
@@ -104,39 +109,69 @@ the result is a single symlink either way.
 
 ### Tracking in place
 
-With no explicit target, a source is tracked **where it already lives under
-`$HOME`**:
+With no explicit target, a source is tracked **where it already lives**, inside
+`$HOME` or anywhere else:
 
 ```sh
 cd ~/Projects/x
-dotsx link ./notes.md      # tracked as Projects/x/notes.md, not ~/notes.md
+dotsx link ./notes.md      # tracked as home/<you>/Projects/x/notes.md
+cd /etc/systemd/system
+dotsx copy ./foo.service   # tracked as etc/systemd/system/foo.service
 ```
 
-This works from any directory and at any depth, and `remove` accepts the same
-relative path you added with.
+This works from any directory and at any depth. `remove` accepts the same path
+you added with, an absolute path, or the exact path `list` prints.
 
-Passing an explicit target is how you deliberately rename or relocate — but be
-aware it leaves the original behind as an untracked file, since the tracked path
-is now somewhere else. The same happens to sources outside `$HOME`, which have no
-home-relative path and fall back to their basename. In both cases the orphan is a
-real file that no longer receives updates; delete it once you've confirmed the
-new location is what you wanted.
+An explicit target is an ordinary path: absolute, or relative to the current
+directory, like the second argument to `cp`. It is how you deliberately rename
+or relocate — but be aware it leaves the original behind as an untracked file,
+since the tracked path is now somewhere else. That orphan is a real file that no
+longer receives updates; delete it once you've confirmed the new location is
+what you wanted.
+
+### System files and root
+
+Files outside `$HOME` usually belong to root, so changing them needs root. Run
+`dotsx` through `sudo`, but keep your own `$HOME`: `sudo` normally resets it to
+`/root`, which would point `dotsx` at root's (empty) `~/.dotsx` instead of yours.
+
+```sh
+sudo HOME="$HOME" "$(command -v dotsx)" sync
+```
+
+(The full path is there because `sudo`'s `secure_path` usually leaves out
+`~/.local/bin`.) Without root, a `link` or `copy` that would have to write to a
+directory you can't write to is refused up front, before anything lands in the
+store. An in-place `copy` never writes to the live location, so you can start
+tracking `/etc/foo.conf` without `sudo`. A `sync` without root deploys
+everything it can and counts the system entries it couldn't write as errors.
+
+Prefer `copy` for system files. Many services refuse to follow a symlink into a
+user's home (`ProtectHome=`, for example). And a link into your store means
+you can edit that system file without `sudo`, so be deliberate about it.
 
 ## Layout and index
 
 ```
-~/.dotsx/store/      your dotfiles, and only those
+~/.dotsx/store/      your files, in a tree that mirrors /
 ~/.dotsx/backups/    prior versions, saved before any overwrite
 ~/.dotsx/index.db    the index
 ```
 
-The index sits beside the store rather than inside it, so the store stays a clean
-tree of nothing but your files — convenient if you point `git` at it.
+The store mirrors the filesystem: `/etc/foo.conf` is kept at
+`~/.dotsx/store/etc/foo.conf` and `~/.bashrc` at
+`~/.dotsx/store/home/<you>/.bashrc`. The index sits beside the store rather than
+inside it, so the store stays a clean tree of nothing but your files —
+convenient if you point `git` at it.
 
 ```
 field_type:track_type:mode:path
-#  f|d        l|c       644   relative/path
+#  f|d        l|c       644   path/relative/to/root
 ```
+
+`path` is relative to `/`, with no leading slash: `home/me/.bashrc`,
+`etc/systemd/system/foo.service`. That one path names both the live file
+(`/<path>`) and the store copy (`~/.dotsx/store/<path>`).
 
 `mode` is the octal permission the file should have, and `sync`/`repair` re-apply
 it. This exists because `git` records only the executable bit: clone a repo
@@ -147,10 +182,10 @@ parses — the path is everything after the third one.
 
 ## Safety model
 
-- Nothing in `$HOME` or `~/.dotsx` that `dotsx` doesn't manage is ever deleted.
-- Before overwriting a tracked file — the store copy on re-add, the home copy on
+- Nothing `dotsx` doesn't manage is ever deleted, wherever it lives.
+- Before overwriting a tracked file — the store copy on re-add, the live copy on
   `sync`/`repair` — the current content is saved to
-  `~/.dotsx/backups/<path>.<store|home>.<timestamp>`.
+  `~/.dotsx/backups/<path>.<store|live>.<timestamp>`.
 - `link` and `copy` refuse to overwrite an existing target unless it is a
   symlink, the source itself, or an unmodified copy `dotsx` already deployed.
   The check compares content, not just the path, so a tracked name whose file has
@@ -159,17 +194,22 @@ parses — the path is everything after the third one.
   It reports it and leaves it for `repair`, which asks first. With no terminal
   available, `repair` defaults to leaving the file untouched.
 - Index writes are atomic: a temp file and a rename.
-- Absolute targets, targets containing `..`, and targets whose parent directory
-  is a symlink are all rejected, so a deploy cannot follow a symlinked parent
-  (`~/.config` pointing at an external drive, say) and write outside the store or
-  `$HOME`. These checks apply to paths read back out of `index.db` too, so a
-  hand-edited index cannot be used to escape either.
+- Targets containing `..`, targets whose parent directory is a symlink, and `/`
+  itself are all rejected, so a deploy cannot follow a symlinked parent
+  (`~/.config` pointing at an external drive, say) and write somewhere other
+  than the path the index records. A target can't be `~/.dotsx`, anything
+  inside it, or any directory that contains it (such as `$HOME` or `/home`), so
+  the store can never be asked to store itself. These checks apply to paths
+  read back out of `index.db` too, along with a ban on absolute paths there, so
+  a hand-edited index can't get around them.
+- `link` and `copy` check that the live location is writable before touching the
+  store, so a permission failure leaves nothing half-done.
 - `sync` and `repair` treat per-entry problems as non-fatal: they fix what they
   can, count what they can't, and report once at the end.
 
 ## Limitations
 
-- **Copies are one-way.** Editing a copy-tracked file in `$HOME` does not update
+- **Copies are one-way.** Editing a copy-tracked file in place does not update
   the store. Re-run `copy` to push it.
 - **Removal is one path at a time.** `remove` always leaves a real file behind
   and never deletes your data, but there is no bulk or recursive un-tracking.
@@ -178,6 +218,14 @@ parses — the path is everything after the third one.
 - **Directories track only their top-level mode.** Permissions inside a tracked
   directory are preserved when copied, but not individually re-enforced.
 - **Symlink sources are rejected.** Point `dotsx` at the real file or directory.
+- **Ownership is not tracked.** Copies keep the owner of the file they were
+  copied from where the user running `dotsx` is allowed to (`cp -p`), so as root
+  a deployed copy takes the owner of its store file. Files you add as root
+  stay root-owned in the store and deploy root-owned. Files that came from a
+  fresh `git clone` belong to you, and so will their deployed copies, until you
+  `chown` them.
+- **Root is your call.** `dotsx` never runs `sudo` itself. See
+  [System files and root](#system-files-and-root).
 - **No git integration.** The store is git-friendly; committing and pushing is
   your job.
 - The line-based index cannot represent paths containing newlines. Colons are
@@ -189,11 +237,12 @@ parses — the path is everything after the third one.
 sh tests/run_tests.sh
 ```
 
-198 assertions across 13 suites, covering the safety guarantees above along with
-the awkward cases: colons in paths, unreadable store files, symlinked parents,
-interrupted operations, and the interactive `repair` prompt under a pseudo-
-terminal. Every suite runs in a throwaway `$HOME`, so the tests never touch your
-real dotfiles. See `tests/README.md`.
+262 assertions across 13 suites, covering the safety guarantees above along with
+the awkward cases: colons and spaces in paths, unreadable store files, symlinked
+parents, paths outside `$HOME`, unwritable destinations, interrupted operations,
+and the interactive `repair` prompt under a pseudo-terminal. Every suite runs in
+a throwaway `$HOME` (and throwaway "system" directories outside it), so the
+tests never touch your real files and never need root. See `tests/README.md`.
 
 `LOGIC.md` is a full walkthrough of the implementation — the data model, every
 shared helper, and each command's exact flow with the reasoning behind each

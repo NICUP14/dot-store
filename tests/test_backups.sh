@@ -4,7 +4,7 @@ SUITE="backups"
 
 # Helper: most recent backup file whose name starts with <relpath>.<kind>.
 latest_backup() {
-	ls -1 "$HOME/.dotsx/backups/$1.$2."* 2>/dev/null | sort | tail -1
+	ls -1 "$HOME/.dotsx/backups/$R/$1.$2."* 2>/dev/null | sort | tail -1
 }
 
 # Re-adding a changed file backs up the old store version before replacing it.
@@ -15,7 +15,7 @@ run copy cfg cfg
 printf 'v2\n' >cfg
 run copy cfg cfg
 assert_rc 0 "re-copy succeeds"
-assert_file_is "$HOME/.dotsx/store/cfg" "v2" "store updated to the new version"
+assert_file_is "$ST/cfg" "v2" "store updated to the new version"
 b=$(latest_backup cfg store)
 assert_eq "1" "$([ -n "$b" ] && echo 1)" "a store backup was created"
 assert_file_is "$b" "v1" "store backup holds the previous version"
@@ -38,7 +38,7 @@ run copy doc doc
 printf 'my local edit\n' >"$HOME/doc"   # edit the deployed copy, do not re-add
 run sync                                # store wins, but the edit is saved
 assert_file_is "$HOME/doc" "orig" "sync restores the store version"
-b=$(latest_backup doc home)
+b=$(latest_backup doc live)
 assert_file_is "$b" "my local edit" "the overwritten home edit was backed up"
 
 # A first-time add has nothing to back up (no spurious backup files).
@@ -66,9 +66,9 @@ run copy cfg cfg          # backs up store v1
 printf 'v3\n' >cfg
 run copy cfg cfg          # backs up store v2 (same timestamp -> collision)
 PATH=${PATH#"$fakebin:"}; export PATH
-n=$(ls -1 "$HOME/.dotsx/backups/cfg.store."* 2>/dev/null | wc -l)
+n=$(ls -1 "$HOME/.dotsx/backups/$R/cfg.store."* 2>/dev/null | wc -l)
 assert_eq "2" "$(echo "$n")" "both same-second store backups are kept"
-got=$(cat "$HOME/.dotsx/backups/cfg.store."* 2>/dev/null | tr -d '[:space:]')
+got=$(cat "$HOME/.dotsx/backups/$R/cfg.store."* 2>/dev/null | tr -d '[:space:]')
 assert_eq "v1v2" "$got" "both prior versions survive the collision"
 
 report

@@ -9,8 +9,8 @@ printf 'A=1\n' >.bashrc
 run link .bashrc bashrc
 assert_rc 0 "link returns 0"
 assert_symlink "$HOME/bashrc" "home target is a symlink"
-assert_link_to "$HOME/bashrc" "$HOME/.dotsx/store/bashrc" "symlink points into the store"
-assert_file_is "$HOME/.dotsx/store/bashrc" "A=1" "store holds the content"
+assert_link_to "$HOME/bashrc" "$ST/bashrc" "symlink points into the store"
+assert_file_is "$ST/bashrc" "A=1" "store holds the content"
 assert_match "$(cat "$HOME/.dotsx/index.db")" "f:l:" "recorded as a file link"
 
 # Re-linking the same target must not create a duplicate DB entry.
@@ -31,7 +31,7 @@ printf 'y\n' >sub/thing
 run link sub/thing
 assert_symlink "$HOME/sub/thing" "default target tracks the source in place"
 assert_missing "$HOME/thing" "not flattened to the basename under ~/"
-assert_match "$(cat "$HOME/.dotsx/index.db")" "f:l:644:sub/thing" "db records the home-relative path"
+assert_match "$(cat "$HOME/.dotsx/index.db")" "f:l:644:$R/sub/thing" "db records the root-relative path"
 
 # Trailing slash on the target is normalized away.
 sandbox
@@ -47,7 +47,7 @@ printf 'B\n' >.bashrc
 run link .bashrc
 assert_rc 0 "link a file in place returns 0"
 assert_symlink "$HOME/.bashrc" "original replaced by a symlink"
-assert_file_is "$HOME/.dotsx/store/.bashrc" "B" "content backed into the store"
+assert_file_is "$ST/.bashrc" "B" "content backed into the store"
 
 # A relative source run from a subdirectory is tracked at its real location
 # under ~/ (the reported bug: ./x was being flattened to ~/x).
@@ -61,7 +61,7 @@ cd "$HOME" || exit 1
 assert_rc 0 "link ./conf from a subdir returns 0"
 assert_symlink "$HOME/projects/app/conf" "relative source tracked in place"
 assert_missing "$HOME/conf" "not flattened to the basename under ~/"
-assert_match "$(cat "$HOME/.dotsx/index.db")" "projects/app/conf" "db path is home-relative"
+assert_match "$(cat "$HOME/.dotsx/index.db")" ":$R/projects/app/conf" "db path is root-relative"
 
 # An explicit target under a directory that does not exist yet under ~/: link
 # must create the parent itself. Regression -- the bare `ln -s` used to fail
@@ -74,9 +74,9 @@ printf 'v\n' >src/two
 run link src/two nested/deep/two.conf
 assert_rc 0 "link creates a missing home parent directory"
 assert_symlink "$HOME/nested/deep/two.conf" "symlink placed under the new parent"
-assert_link_to "$HOME/nested/deep/two.conf" "$HOME/.dotsx/store/nested/deep/two.conf" \
+assert_link_to "$HOME/nested/deep/two.conf" "$ST/nested/deep/two.conf" \
 	"symlink points into the store"
-assert_match "$(cat "$HOME/.dotsx/index.db")" "f:l:644:nested/deep/two.conf" "db entry recorded"
+assert_match "$(cat "$HOME/.dotsx/index.db")" "f:l:644:$R/nested/deep/two.conf" "db entry recorded"
 run ghost
 assert_match "$OUT" "no ghost files" "no ghost left behind"
 
@@ -88,7 +88,7 @@ printf 'i\n' >cfgdir/f
 run link cfgdir
 assert_rc 0 "link a directory returns 0"
 assert_symlink "$HOME/cfgdir" "directory replaced by a symlink"
-assert_file_is "$HOME/.dotsx/store/cfgdir/f" "i" "directory contents in the store"
+assert_file_is "$ST/cfgdir/f" "i" "directory contents in the store"
 assert_match "$(cat "$HOME/.dotsx/index.db")" "d:l:" "recorded as a directory link"
 
 report

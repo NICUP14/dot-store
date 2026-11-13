@@ -17,7 +17,7 @@ sandbox
 run init
 printf 'A\n' >.bashrc
 run link .bashrc bashrc
-printf 'f:l:644:ghost\n' >>"$HOME/.dotsx/index.db"
+printf '%s\n' "f:l:644:$R/ghost" >>"$HOME/.dotsx/index.db"
 run repair
 assert_rc 1 "missing source is a non-fatal error"
 assert_match "$OUT" "Manual intervention" "reports the corruption"
